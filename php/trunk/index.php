@@ -151,121 +151,152 @@ if (isset($ipaddr) && ($error === "")) {
     str_replace("-->", "*dash*dash*gt*", print_r($results['check']['status'], true));
     echo "-->";
 
-    $info = assembleData($results['check']['status']);
-
-    $server_name = $info['info']['hostname'];
-    $server_ip = $ipaddr;
-    $server_port = $info['info']['hostport'];
-    $server_maxplayers = $info['info']['maxplayers'];
-    $server_numplayers = $info['info']['numplayers'];
-    $server_map = $info['info']['mapname'];
-    $time = date("Y/m/d H:i:s T");
-    $i=0;
-    foreach($info['players'] as $player) {
-        echo "<!--";
-        str_replace("-->", "*dash*dash*gt*", print_r($player, true));
-        echo "-->";
-        if (strpos($player['player'], " ") > -1) {
-            list($players[$i]['clan_tag'], $players[$i]['server_name']) = split(" ", $player['player']);
-        } else {
-            $players[$i]['server_name'] = $player['player'];
-            $players[$i]['clan_tag'] = "";
+    if (isset($results['check']['status'])) {
+        $info = assembleData($results['check']['status']);
+    
+        $server_name = $info['info']['hostname'];
+        $server_ip = $ipaddr;
+        $server_port = $info['info']['hostport'];
+        $server_maxplayers = $info['info']['maxplayers'];
+        $server_numplayers = $info['info']['numplayers'];
+        $server_map = $info['info']['mapname'];
+        $time = date("Y/m/d H:i:s T");
+        $i=0;
+        if ($server_numplayers > 0) {
+            foreach($info['players'] as $player) {
+                echo "<!--";
+                str_replace("-->", "*dash*dash*gt*", print_r($player, true));
+                echo "-->";
+                if (strpos($player['player'], " ") > -1) {
+                    list($players[$i]['clan_tag'], $players[$i]['server_name']) = split(" ", $player['player']);
+                } else {
+                    $players[$i]['server_name'] = $player['player'];
+                    $players[$i]['clan_tag'] = "";
+                }
+                echo '<script language="JavaScript">' . "\n";
+                echo "<!--\n";
+                echo 'updateStatus("Querying Gamespy for PID ' . $player['pid'] . ' (' . ($i+1) ."/$server_numplayers)" .'...");' . "\n";
+                echo "-->\n";
+                echo "</script>\n";
+                if (isset($player['pid'])) {
+                    $players[$i]['pid'] = $player['pid'];
+                    $players[$i]['gamespy_name'] = getGamespyName($player['pid']);
+                    if (trim($players[$i]['gamespy_name']) == "") {
+                        $players[$i]['gamespy_name'] = "Error from gamespy";
+                    }
+                } else {
+                    $players[$i]['pid'] = "Error in game server reply";
+                    $players[$i]['gamespy_name'] = "Error in game server reply";
+                }
+                $i++;
+            }
         }
+    
+        $report = '<h1>Report for Server</h1>';
+        $report .= '<table border="0">';
+        $report .= "<tr><td>Name:</td><td>" . htmlspecialchars($server_name) . "</td></tr>";
+        $report .= "<tr><td>Address:</td><td>$server_ip:$server_port</td></tr>";
+        $report .= "<tr><td>Players</td><td>$server_numplayers/$server_maxplayers</td></tr>";
+        $report .= "<tr><td>Map:</td><td>" . htmlspecialchars($server_map) . "</td></tr>";
+        $report .= "<tr><td>Report time:</td><td>" . $time . "</td></tr>";
+        $report .= "</table>";
+    
+        $hackerArray = array();
+        $hackers = "";
+        $possible = "";
+    
+        echo $report;
+    
+        $table = "";
+        if ($server_numplayers > 0) {
+            $table .= '<table border="1">';
+            $table .= '<thead><tr><th>Server Name</th><th>Gamespy Name</th><th>Clan Tag</th><th>PID</th></tr></thead>';
+            $table .= '<tbody>';
+            $hackerCount = 0;
+            foreach($players as $player) {
+                $table .= '<tr><td>' . htmlspecialchars($player['server_name']) . '</td>';
+                $table .= '<td>' . htmlspecialchars($player['gamespy_name']) . '</td>';
+                $table .= '<td>' . ($player['clan_tag']===""?"&nbsp;":htmlspecialchars($player['clan_tag'])) . '</td>';
+                $table .= '<td>' . htmlspecialchars($player['pid']) . '</td></tr>';
+        
+                // Check to see if this is a name hack.
+                if($player['server_name'] !== $player['gamespy_name']) {
+                    // If the mismatch is due to our error messages move to the next loop iteration.
+                    if ($player['gamespy_name'] == "Error from gamespy" || $player['gamespy_name'] == "Error in game server reply") {
+                        continue;
+                    }
+                    if(isFalseHit($player)) {
+                        $possible .= "<p>Possible false hit<a href=\"#foot\">*</a>";
+                        $possible .= "<br>Name on server: " . htmlspecialchars($player['server_name']);
+                        $possible .= "<br>Name from Gamespy: " . htmlspecialchars($player['gamespy_name']);
+                        $possible .= "<br>PID: " . htmlspecialchars($player['pid']) . "</p>";
+                    } else {
+                        $hackerArray[$hackerCount++] = $player;
+                        $hackers .= "<p>Found a Name Hacker!!!";
+                        $hackers .= "<br>Name on server: " . htmlspecialchars($player['server_name']);
+                        $hackers .= "<br>Name from Gamespy: " . htmlspecialchars($player['gamespy_name']);
+                        $hackers .= "<br>PID: " . htmlspecialchars($player['pid']) . "</p>";
+                    }
+                }
+            }
+            $table .= '</tbody></table>';
+        }
+    
+        $report .= $hackers;
+        $report .= $possible;
+        $report .= $table;
+    
         echo '<script language="JavaScript">' . "\n";
         echo "<!--\n";
-        echo 'updateStatus("Querying Gamespy for PID ' . $player['pid'] . ' (' . ($i+1) ."/$server_numplayers)" .'...");' . "\n";
+        echo 'updateStatus("");' . "\n";
         echo "-->\n";
         echo "</script>\n";
-        if (isset($player['pid'])) {
-            $players[$i]['pid'] = $player['pid'];
-            $players[$i]['gamespy_name'] = getGamespyName($player['pid']);
-            if (trim($players[$i]['gamespy_name']) == "") {
-                $players[$i]['gamespy_name'] = "Error from gamespy";
-            }
-        } else {
-            $players[$i]['pid'] = "Error in game server reply";
-            $players[$i]['gamespy_name'] = "Error in game server reply";
+    
+        if ($hackers !== "") {
+            $tracker = "http://bf2tracker.com/webspec/index.php?addr=$ipaddr:$port:$spyport";
+            echo '<p>Please verify these name hackers at: <a href="' . $tracker . '">' 
+                . $tracker . '</a>. Click on the player\'s server name and verify that the user page displays the same PID and Gamespy name.';
         }
-        $i++;
-    }
-
-    $report = '<h1>Report for Server</h1>';
-    $report .= '<table border="0">';
-    $report .= "<tr><td>Name:</td><td>" . htmlspecialchars($server_name) . "</td></tr>";
-    $report .= "<tr><td>Address:</td><td>$server_ip:$server_port</td></tr>";
-    $report .= "<tr><td>Players</td><td>$server_numplayers/$server_maxplayers</td></tr>";
-    $report .= "<tr><td>Map:</td><td>" . htmlspecialchars($server_map) . "</td></tr>";
-    $report .= "<tr><td>Report time:</td><td>" . $time . "</td></tr>";
-    $report .= "</table>";
-
-    $hackerArray = array();
-    $hackers = "";
-    $possible = "";
-
-    echo $report;
-
-    $table = "";
-    $table .= '<table border="1">';
-    $table .= '<thead><tr><th>Server Name</th><th>Gamespy Name</th><th>Clan Tag</th><th>PID</th></tr></thead>';
-    $table .= '<tbody>';
-    $hackerCount = 0;
-    foreach($players as $player) {
-        $table .= '<tr><td>' . htmlspecialchars($player['server_name']) . '</td>';
-        $table .= '<td>' . htmlspecialchars($player['gamespy_name']) . '</td>';
-        $table .= '<td>' . ($player['clan_tag']===""?"&nbsp;":htmlspecialchars($player['clan_tag'])) . '</td>';
-        $table .= '<td>' . htmlspecialchars($player['pid']) . '</td></tr>';
-
-        // Check to see if this is a name hack.
-        if($player['server_name'] !== $player['gamespy_name']) {
-            // If the mismatch is due to our error messages move to the next loop iteration.
-            if ($player['gamespy_name'] == "Error from gamespy" || $player['gamespy_name'] == "Error in game server reply") {
-                continue;
-            }
-            if(isFalseHit($player)) {
-                $possible .= "<p>Possible false hit<a href=\"#foot\">*</a>";
-                $possible .= "<br>Name on server: " . htmlspecialchars($player['server_name']);
-                $possible .= "<br>Name from Gamespy: " . htmlspecialchars($player['gamespy_name']);
-                $possible .= "<br>PID: " . htmlspecialchars($player['pid']) . "</p>";
-            } else {
-                $hackerArray[$hackerCount++] = $player;
-                $hackers .= "<p>Found a Name Hacker!!!";
-                $hackers .= "<br>Name on server: " . htmlspecialchars($player['server_name']);
-                $hackers .= "<br>Name from Gamespy: " . htmlspecialchars($player['gamespy_name']);
-                $hackers .= "<br>PID: " . htmlspecialchars($player['pid']) . "</p>";
-            }
+    
+        echo $hackers;
+        echo $possible;
+        echo $table;
+    
+        if ($hackers !== "" && $use_database) {
+            saveReport(htmlspecialchars($server_name) . " (" . $time . ")", $report,
+                       $dbserver, $user, $pass, $database);
         }
-    }
-    $table .= '</tbody></table>';
+    
+        echo "\n<!-- " . count($hackerArray) . " -->\n";
+    
+        if ($use_database && count($hackerArray) > 0) {
+            saveHackers($hackerArray, $server_name, "$server_ip:$server_port", $dbserver, $user, $pass, $database);
+        }
+    } else {
+        ?>
+            <script language="JavaScript">
+            <!--
+            updateStatus("");
+            -->\n
+            </script>
+            <h2>Unable to contact server</h2>
+            <p>This may because the server is down or the server is not on the port you 
+            specified or the gamespy port is non-standard.</p>
+            <p>If the bf2 server is on the standard port of 16567, you do not need to 
+            specify it unless you also want to specify the gamespy port. Using the ATG Inf server 
+            as an example, you can specify this server as 72.233.42.82 or 
+            72.233.42.82:16567 or 72.233.42.82:16567:29900. The results will all be the 
+            same.</p>
+            <p>In most cases when a bf2 server on a port other than 16567, you just need
+            to enter the it as &lt;ip address&gt;:&lt;port&gt; (example 193.11.12.156:16569). In the 
+            cases where this does not work, a quick workaround is to look the server up on 
+            bf2tracker.com. When you view the server's information, the url will contain 
+            "addr=", the information following the equal sign can be used here. For example 
+            in the following url 
+            http://bf2tracker.com/webspec/index.php?addr=193.11.12.156:16569:29902 the
+            193.11.12.156:16569:29902 is an acceptable value to use with this tool.</p>
 
-    $report .= $hackers;
-    $report .= $possible;
-    $report .= $table;
-
-    echo '<script language="JavaScript">' . "\n";
-    echo "<!--\n";
-    echo 'updateStatus("");' . "\n";
-    echo "-->\n";
-    echo "</script>\n";
-
-    if ($hackers !== "") {
-        $tracker = "http://bf2tracker.com/webspec/index.php?addr=$ipaddr:$port:$spyport";
-        echo '<p>Please verify these name hackers at: <a href="' . $tracker . '">' 
-            . $tracker . '</a>. Click on the player\'s server name and verify that the user page displays the same PID and Gamespy name.';
-    }
-
-    echo $hackers;
-    echo $possible;
-    echo $table;
-
-    if ($hackers !== "" && $use_database) {
-        saveReport(htmlspecialchars($server_name) . " (" . $time . ")", $report,
-                   $dbserver, $user, $pass, $database);
-    }
-
-    echo "\n<!-- " . count($hackerArray) . " -->\n";
-
-    if ($use_database && count($hackerArray) > 0) {
-        saveHackers($hackerArray, $server_name, "$server_ip:$server_port", $dbserver, $user, $pass, $database);
+        <?php
     }
 }
 
