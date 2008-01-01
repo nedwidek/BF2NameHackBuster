@@ -1,0 +1,35 @@
+body {
+    background-color: #474642;
+    color: #C0BCB0
+}
+
+a:link {
+    color:#F6B620;
+    background:transparent;
+}
+
+a:visited {
+    color:#F6B620;
+    background:transparent;
+}
+
+a:active {
+    color:#F6B620;
+    background:transparent;
+}
+
+a:hover {
+    color:#FFEE40;
+    border-bottom-width: 1px;
+    border-bottom-style: dotted;
+    border-bottom-color: #FFEE40;
+    background:transparent;
+}
+
+#formtable {
+    background-color: #1E1C18;
+}
+
+h2 {
+    color: #C0BCB0;
+}
