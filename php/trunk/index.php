@@ -162,10 +162,13 @@ if (isset($ipaddr) && ($error === "")) {
         $server_map = $info['info']['mapname'];
         $time = date("Y/m/d H:i:s T");
         $i=0;
+        $count = 0;
+        $numBots = 0;
+        $numErrors = 0;
         if ($server_numplayers > 0) {
             foreach($info['players'] as $player) {
                 echo "<!--";
-                str_replace("-->", "*dash*dash*gt*", print_r($player, true));
+                echo str_replace("-->", "*dash*dash*gt*", print_r($player, true));
                 echo "-->";
                 if (strpos($player['player'], " ") > -1) {
                     list($players[$i]['clan_tag'], $players[$i]['server_name']) = split(" ", $player['player']);
@@ -173,20 +176,32 @@ if (isset($ipaddr) && ($error === "")) {
                     $players[$i]['server_name'] = $player['player'];
                     $players[$i]['clan_tag'] = "";
                 }
-                echo '<script language="JavaScript">' . "\n";
-                echo "<!--\n";
-                echo 'updateStatus("Querying Gamespy for PID ' . $player['pid'] . ' (' . ($i+1) ."/$server_numplayers)" .'...");' . "\n";
-                echo "-->\n";
-                echo "</script>\n";
                 if (isset($player['pid'])) {
-                    $players[$i]['pid'] = $player['pid'];
-                    $players[$i]['gamespy_name'] = getGamespyName($player['pid']);
-                    if (trim($players[$i]['gamespy_name']) == "") {
-                        $players[$i]['gamespy_name'] = "Error from gamespy";
+                    if ($player['AIBot'] == 1) {
+                        $players[$i]['error'] = 1;
+                        $players[$i]['message'] = "Player is BOT";
+                        $numBots++;
+                        // Purposefully not incrementing $numErrors since this is not a true
+                        // error. Just taking advantage of the way errors display.
+                    } else {
+                        echo '<script language="JavaScript">' . "\n";
+                        echo "<!--\n";
+                        echo 'updateStatus("Querying Gamespy for PID ' . $player['pid'] . ' (' . (++$count) ."/$server_numplayers)" .'...");' . "\n";
+                        echo "-->\n";
+                        echo "</script>\n";
+                        $players[$i]['pid'] = $player['pid'];
+                        $players[$i]['gamespy_name'] = getGamespyName($player['pid']);
+                        if (trim($players[$i]['gamespy_name']) == "") {
+                            $players[$i]['error'] = 1;
+                            $players[$i]['message'] = "Error from gamespy";
+                            $numErrors++;
+                        }
                     }
                 } else {
-                    $players[$i]['pid'] = "Error in game server reply";
-                    $players[$i]['gamespy_name'] = "Error in game server reply";
+                    $players[$i]['pid'] = "";
+                    $players[$i]['error'] = 1;
+                    $players[$i]['message'] = "Error in game server reply";
+                    $numErrors++;
                 }
                 $i++;
             }
@@ -199,6 +214,12 @@ if (isset($ipaddr) && ($error === "")) {
         $report .= "<tr><td>Players</td><td>$server_numplayers/$server_maxplayers</td></tr>";
         $report .= "<tr><td>Map:</td><td>" . htmlspecialchars($server_map) . "</td></tr>";
         $report .= "<tr><td>Report time:</td><td>" . $time . "</td></tr>";
+        if ($numBots > 0) {
+            $report .= "<tr><td>Number of Bots:</td><td>$numBots</td></tr>";
+        }
+        if ($numErrors > 0) {
+            $report .= "<tr><td>Number of processing errors:</td><td>$numErrors</td></tr>";
+        }
         $report .= "</table>";
     
         $hackerArray = array();
@@ -214,29 +235,34 @@ if (isset($ipaddr) && ($error === "")) {
             $table .= '<tbody>';
             $hackerCount = 0;
             foreach($players as $player) {
-                $table .= '<tr><td>' . htmlspecialchars($player['server_name']) . '</td>';
-                $table .= '<td>' . htmlspecialchars($player['gamespy_name']) . '</td>';
-                $table .= '<td>' . ($player['clan_tag']===""?"&nbsp;":htmlspecialchars($player['clan_tag'])) . '</td>';
-                $table .= '<td>' . htmlspecialchars($player['pid']) . '</td></tr>';
-        
-                // Check to see if this is a name hack.
-                if($player['server_name'] !== $player['gamespy_name']) {
-                    // If the mismatch is due to our error messages move to the next loop iteration.
-                    if ($player['gamespy_name'] == "Error from gamespy" || $player['gamespy_name'] == "Error in game server reply") {
-                        continue;
+                if (!isset($player['error'])) {
+                    $table .= '<tr><td>' . htmlspecialchars($player['server_name']) . '</td>';
+                    $table .= '<td>' . htmlspecialchars($player['gamespy_name']) . '</td>';
+                    $table .= '<td>' . ($player['clan_tag']===""?"&nbsp;":htmlspecialchars($player['clan_tag'])) . '</td>';
+                    $table .= '<td>' . htmlspecialchars($player['pid']) . '</td></tr>';
+    
+    
+                    // Check to see if this is a name hack.
+                    if($player['server_name'] !== $player['gamespy_name']) {
+                        // If the mismatch is due to our error messages move to the next loop iteration.
+                        if(isFalseHit($player)) {
+                            $possible .= "<p>Possible false hit<a href=\"#foot\">*</a>";
+                            $possible .= "<br>Name on server: " . htmlspecialchars($player['server_name']);
+                            $possible .= "<br>Name from Gamespy: " . htmlspecialchars($player['gamespy_name']);
+                            $possible .= "<br>PID: " . htmlspecialchars($player['pid']) . "</p>";
+                        } else {
+                            $hackerArray[$hackerCount++] = $player;
+                            $hackers .= "<p>Found a Name Hacker!!!";
+                            $hackers .= "<br>Name on server: " . htmlspecialchars($player['server_name']);
+                            $hackers .= "<br>Name from Gamespy: " . htmlspecialchars($player['gamespy_name']);
+                            $hackers .= "<br>PID: " . htmlspecialchars($player['pid']) . "</p>";
+                        }
                     }
-                    if(isFalseHit($player)) {
-                        $possible .= "<p>Possible false hit<a href=\"#foot\">*</a>";
-                        $possible .= "<br>Name on server: " . htmlspecialchars($player['server_name']);
-                        $possible .= "<br>Name from Gamespy: " . htmlspecialchars($player['gamespy_name']);
-                        $possible .= "<br>PID: " . htmlspecialchars($player['pid']) . "</p>";
-                    } else {
-                        $hackerArray[$hackerCount++] = $player;
-                        $hackers .= "<p>Found a Name Hacker!!!";
-                        $hackers .= "<br>Name on server: " . htmlspecialchars($player['server_name']);
-                        $hackers .= "<br>Name from Gamespy: " . htmlspecialchars($player['gamespy_name']);
-                        $hackers .= "<br>PID: " . htmlspecialchars($player['pid']) . "</p>";
-                    }
+                } else {
+                    $table .= '<tr><td>' . htmlspecialchars($player['server_name']) . '</td>';
+                    $table .= '<td>' . htmlspecialchars($player['message']) . '</td>';
+                    $table .= '<td>' . ($player['clan_tag']===""?"&nbsp;":htmlspecialchars($player['clan_tag'])) . '</td>';
+                    $table .= '<td>' . htmlspecialchars($player['message']) . '</td></tr>';
                 }
             }
             $table .= '</tbody></table>';
@@ -340,8 +366,6 @@ function assembleData ($rsp) {
     foreach($rsp as $line) {
         echo "<!--" . str_replace("-->", "*dash*dash*gt*", $line) . "-->\n";
     }
-    //$rsp=explode((chr(0x00).chr(0x00)."PING"."splitnum".chr(0x00)),(chr(0x00).$rsp));
-    //array_shift($rsp);
     sort($rsp);
     foreach($rsp as $i => $j) { 
         $rsp[$i]=substr($j,2); 
@@ -431,7 +455,7 @@ function saveHackers($hackerArray, $server_name, $server_addr,
                          mysql_real_escape_string($hacker['gamespy_name']));
         mysql_query($query);
 
-        echo mysql_error();
+        echo "<!-- " . mysql_error() . "-->";
 
         if ($hacker['server_name'] == "") {
             $hacker['server_name'] = " ";
@@ -444,7 +468,7 @@ function saveHackers($hackerArray, $server_name, $server_addr,
                          mysql_real_escape_string($server_addr),
                          mysql_real_escape_string(date("Y/m/d H:i:s T")));
         mysql_query($query);
-        echo mysql_error();
+        echo "<!-- " . mysql_error() . "-->";
     }
     
     mysql_close();
