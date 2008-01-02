@@ -33,3 +33,10 @@ a:hover {
 h2 {
     color: #C0BCB0;
 }
+
+td,th {
+    padding-left: 6px;
+    padding-right: 6px;
+    padding-top: 1px;
+    padding-bottom: 1px;
+}

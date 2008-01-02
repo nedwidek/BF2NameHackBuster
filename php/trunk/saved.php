@@ -29,7 +29,7 @@ require_once './config.php';
 
 include_once 'head.php';
 
-mysql_connect($dbserver,$user,$pass);
+mysql_connect("$dbserver:$dbport",$user,$pass);
 @mysql_select_db($database);
 
 if ($id) {

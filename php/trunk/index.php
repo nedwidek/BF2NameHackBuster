@@ -109,6 +109,8 @@ if (isset($ipaddr) && ($error === "")) {
         -->
         </script>
     <?php
+
+    flush();
     
     // They've entered a valid ip address
     // server to check.
@@ -147,12 +149,12 @@ if (isset($ipaddr) && ($error === "")) {
         exit;
     }
 
-    echo "<!--";
-    str_replace("-->", "*dash*dash*gt*", print_r($results['check']['status'], true));
-    echo "-->";
-
     if (isset($results['check']['status'])) {
         $info = assembleData($results['check']['status']);
+
+        echo "<!--";
+        echo str_replace("-->", "*dash*dash*gt*", print_r($info, true));
+        echo "-->";
     
         $server_name = $info['info']['hostname'];
         $server_ip = $ipaddr;
@@ -160,6 +162,9 @@ if (isset($ipaddr) && ($error === "")) {
         $server_maxplayers = $info['info']['maxplayers'];
         $server_numplayers = $info['info']['numplayers'];
         $server_map = $info['info']['mapname'];
+        $server_teams = array();
+        $server_teams[1] = $info['info']['bf2_team1'];
+        $server_teams[2] = $info['info']['bf2_team2'];
         $time = date("Y/m/d H:i:s T");
         $i=0;
         $count = 0;
@@ -180,6 +185,12 @@ if (isset($ipaddr) && ($error === "")) {
                     if ($player['AIBot'] == 1) {
                         $players[$i]['error'] = 1;
                         $players[$i]['message'] = "Player is BOT";
+                        $players[$i]['pid'] = $player['pid'];
+                        $players[$i]['team'] = $player['team'];
+                        $players[$i]['score'] = $player['score'];
+                        $players[$i]['ping'] = $player['ping'];
+                        $players[$i]['kills'] = $player['skill'];
+                        $players[$i]['deaths'] = $player['deaths'];
                         $numBots++;
                         // Purposefully not incrementing $numErrors since this is not a true
                         // error. Just taking advantage of the way errors display.
@@ -189,7 +200,13 @@ if (isset($ipaddr) && ($error === "")) {
                         echo 'updateStatus("Querying Gamespy for PID ' . $player['pid'] . ' (' . (++$count) ."/$server_numplayers)" .'...");' . "\n";
                         echo "-->\n";
                         echo "</script>\n";
+                        flush();
                         $players[$i]['pid'] = $player['pid'];
+                        $players[$i]['team'] = $player['team'];
+                        $players[$i]['score'] = $player['score'];
+                        $players[$i]['ping'] = $player['ping'];
+                        $players[$i]['kills'] = $player['skill'];
+                        $players[$i]['deaths'] = $player['deaths'];
                         $players[$i]['gamespy_name'] = getGamespyName($player['pid']);
                         if (trim($players[$i]['gamespy_name']) == "") {
                             $players[$i]['error'] = 1;
@@ -231,7 +248,7 @@ if (isset($ipaddr) && ($error === "")) {
         $table = "";
         if ($server_numplayers > 0) {
             $table .= '<table border="1">';
-            $table .= '<thead><tr><th>Server Name</th><th>Gamespy Name</th><th>Clan Tag</th><th>PID</th></tr></thead>';
+            $table .= '<thead><tr><th>Server Name</th><th>Gamespy Name</th><th>Clan Tag</th><th>PID</th><th>Score</th><th>Kills</th><th>Deaths</th><th>Ping</th><th>Team</th></tr></thead>';
             $table .= '<tbody>';
             $hackerCount = 0;
             foreach($players as $player) {
@@ -239,7 +256,12 @@ if (isset($ipaddr) && ($error === "")) {
                     $table .= '<tr><td>' . htmlspecialchars($player['server_name']) . '</td>';
                     $table .= '<td>' . htmlspecialchars($player['gamespy_name']) . '</td>';
                     $table .= '<td>' . ($player['clan_tag']===""?"&nbsp;":htmlspecialchars($player['clan_tag'])) . '</td>';
-                    $table .= '<td>' . htmlspecialchars($player['pid']) . '</td></tr>';
+                    $table .= '<td align="right">' . htmlspecialchars($player['pid']) . '</td>';
+                    $table .= '<td align="right">' . htmlspecialchars($player['score']) . '</td>';
+                    $table .= '<td align="right">' . htmlspecialchars($player['kills']) . '</td>';
+                    $table .= '<td align="right">' . htmlspecialchars($player['deaths']) . '</td>';
+                    $table .= '<td align="right">' . htmlspecialchars($player['ping']) . '</td>';
+                    $table .= '<td>' . htmlspecialchars($server_teams[$player['team']]) . '</td></tr>';
     
     
                     // Check to see if this is a name hack.
@@ -262,7 +284,16 @@ if (isset($ipaddr) && ($error === "")) {
                     $table .= '<tr><td>' . htmlspecialchars($player['server_name']) . '</td>';
                     $table .= '<td>' . htmlspecialchars($player['message']) . '</td>';
                     $table .= '<td>' . ($player['clan_tag']===""?"&nbsp;":htmlspecialchars($player['clan_tag'])) . '</td>';
-                    $table .= '<td>' . htmlspecialchars($player['message']) . '</td></tr>';
+                    if (isset($player['pid'])) {
+                        $table .= '<td align="right">' . htmlspecialchars($player['pid']) . '</td>';
+                        $table .= '<td align="right">' . htmlspecialchars($player['score']) . '</td>';
+                        $table .= '<td align="right">' . htmlspecialchars($player['kills']) . '</td>';
+                        $table .= '<td align="right">' . htmlspecialchars($player['deaths']) . '</td>';
+                        $table .= '<td align="right">' . htmlspecialchars($player['ping']) . '</td>';
+                        $table .= '<td>' . htmlspecialchars($server_teams[$player['team']]) . '</td></tr>';
+                    } else {
+                        $table .= '<td colspan="5">' . htmlspecialchars($player['message']) . '</td></tr>';
+                    }
                 }
             }
             $table .= '</tbody></table>';
@@ -277,6 +308,7 @@ if (isset($ipaddr) && ($error === "")) {
         echo 'updateStatus("");' . "\n";
         echo "-->\n";
         echo "</script>\n";
+        flush();
     
         if ($hackers !== "") {
             $tracker = "http://bf2tracker.com/webspec/index.php?addr=$ipaddr:$port:$spyport";
@@ -290,13 +322,13 @@ if (isset($ipaddr) && ($error === "")) {
     
         if ($hackers !== "" && $use_database) {
             saveReport(htmlspecialchars($server_name) . " (" . $time . ")", $report,
-                       $dbserver, $user, $pass, $database);
+                       "$dbserver:$dbport", $user, $pass, $database);
         }
     
         echo "\n<!-- " . count($hackerArray) . " -->\n";
     
         if ($use_database && count($hackerArray) > 0) {
-            saveHackers($hackerArray, $server_name, "$server_ip:$server_port", $dbserver, $user, $pass, $database);
+            saveHackers($hackerArray, $server_name, "$server_ip:$server_port", "$dbserver:$dbport", $user, $pass, $database);
         }
     } else {
         ?>
@@ -332,10 +364,18 @@ function getGamespyName($pid) {
     $loc = 'http://bf2web.gamespy.com/ASP/getplayerinfo.aspx?pid='
             . $pid . '&info=per*,cmb*,twsc,cpcp,cacp,dfcp,kila,heal,rviv,rsup,rpar,tgte,dkas,dsab,cdsc,rank,cmsc,kick,kill,deth,suic,ospm,klpm,klpr,dtpr,bksk,wdsk,bbrs,tcdr,ban,dtpm,lbtl,osaa,vrk,tsql,tsqm,tlwf,mvks,vmks,mvn*,vmr*,fkit,fmap,fveh,fwea,wtm-,wkl-,wdt-,wac-,wkd-,vtm-,vkl-,vdt-,vkd-,vkr-,atm-,awn-,alo-,abr-,ktm-,kkl-,kdt-,kkd-';
 
-    // Must set the user agent to this or else the Gamespy won't give us the info.
-    ini_set('user_agent','GameSpyHTTP/1.0');
 
-    $response = file_get_contents($loc);
+    $request = "GET $loc HTTP/1.0\r\n";
+    $request .= "user_agent: GameSpyHTTP/1.0\r\n\r\n";
+
+    if ($sock = fsockopen("bf2web.gamespy.com", 80, $errno, $errstr, 15)) {
+        if (fwrite($sock, $request)) {
+            while (!feof($sock)) {
+                $response .= fread($sock, 4096);
+            }
+        }
+        fclose($sock);
+    }
 
     $matches = array();
     preg_match('/^D\s+' . $pid . '\s+(\S+)\s+.*/m', $response, $matches);
