@@ -175,7 +175,7 @@ if (isset($ipaddr) && ($error === "")) {
                 echo "<!--";
                 echo str_replace("-->", "*dash*dash*gt*", print_r($player, true));
                 echo "-->";
-                if (strpos($player['player'], " ") > -1) {
+                if (strrpos($player['player'], " ") > -1) {
                     list($players[$i]['clan_tag'], $players[$i]['server_name']) = split(" ", $player['player']);
                 } else {
                     $players[$i]['server_name'] = $player['player'];
