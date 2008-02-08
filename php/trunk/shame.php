@@ -27,6 +27,12 @@
 error_reporting(E_ALL & ~E_NOTICE);
 require_once './config.php';
 
+// Fixing register_globals == off
+if(!isset($PHP_SELF)) {
+    $PHP_SELF = $_SERVER['PHP_SELF'];
+    $pid = (isset($_REQUEST['pid'])?$_REQUEST['pid']:NULL);
+}
+
 include_once 'head.php';
 
 mysql_connect("$dbserver:$dbport",$user,$pass);

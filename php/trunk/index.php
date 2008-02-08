@@ -34,6 +34,12 @@ include_once("./head.php");
 <h2>BF2 Name Hack Buster</h2>
 <?php
 
+// Fixing register_globals == off
+if(!isset($PHP_SELF)) {
+    $PHP_SELF = $_SERVER['PHP_SELF'];
+    $ipaddr = (isset($_REQUEST['ipaddr'])?$_REQUEST['ipaddr']:NULL);
+}
+
 $port=0;
 $spyport=0;
 
