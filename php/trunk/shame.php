@@ -52,7 +52,7 @@ if ($pid) {
             $pid = mysql_result($result, $i, "hackers.pid");
 
             echo "<h2>Wall of Shame</h2>";
-            echo "<h3>" . htmlspecialchars($name) . " (" . htmlspecialchars($pid) . ")</h3>";
+            echo "<h3>" . htmlspecialchars($name) . " (" . htmlspecialchars($pid) . ")</h3><a href=\"http://bf2tracker.com/bf2_userprofile.php?bf2id=$pid\">BF2Tracker.com Profile</a>";
             echo "<hr/><ul>";
         }
 
