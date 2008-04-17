@@ -147,8 +147,15 @@ if (isset($ipaddr) && ($error === "")) {
 
 
     // Send requests and parse the data
+    $info = "";
     try {
-        $results = $gq->requestData();
+        $tries = 0;
+        do {
+            $results = $gq->requestData();
+            if (isset($results['check']['status'])) {
+                $info = assembleData($results['check']['status']);
+            }
+        } while($tries < 6 && $info === false);
     }
     catch (Exception $e) {
         print 'An error occurred while requesting or processing data.';
@@ -156,12 +163,11 @@ if (isset($ipaddr) && ($error === "")) {
     }
 
     if (isset($results['check']['status'])) {
-        $info = assembleData($results['check']['status']);
 
         echo "<!--";
         echo str_replace("-->", "*dash*dash*gt*", print_r($info, true));
         echo "-->";
-    
+
         $server_name = $info['info']['hostname'];
         $server_ip = $ipaddr;
         $server_port = $info['info']['hostport'];
@@ -181,8 +187,9 @@ if (isset($ipaddr) && ($error === "")) {
                 echo "<!--";
                 echo str_replace("-->", "*dash*dash*gt*", print_r($player, true));
                 echo "-->";
-                if (strrpos($player['player'], " ") > -1) {
-                    list($players[$i]['clan_tag'], $players[$i]['server_name']) = split(" ", $player['player']);
+                if (($pos = strrpos($player['player'], " ")) > -1) {
+                    $players[$i]['clan_tag'] = substr($player['player'], 0, $pos);
+                    $players[$i]['server_name'] = substr($player['player'], $pos + 1);
                 } else {
                     $players[$i]['server_name'] = $player['player'];
                     $players[$i]['clan_tag'] = "";
@@ -229,7 +236,7 @@ if (isset($ipaddr) && ($error === "")) {
                 $i++;
             }
         }
-    
+
         $report = '<h1>Report for Server</h1>';
         $report .= '<table border="0">';
         $report .= "<tr><td>Name:</td><td>" . htmlspecialchars($server_name) . "</td></tr>";
@@ -244,13 +251,13 @@ if (isset($ipaddr) && ($error === "")) {
             $report .= "<tr><td>Number of processing errors:</td><td>$numErrors</td></tr>";
         }
         $report .= "</table>";
-    
+
         $hackerArray = array();
         $hackers = "";
         $possible = "";
-    
+
         echo $report;
-    
+
         $table = "";
         if ($server_numplayers > 0) {
             $table .= '<table border="1">';
@@ -268,8 +275,8 @@ if (isset($ipaddr) && ($error === "")) {
                     $table .= '<td align="right">' . htmlspecialchars($player['deaths']) . '</td>';
                     $table .= '<td align="right">' . htmlspecialchars($player['ping']) . '</td>';
                     $table .= '<td>' . htmlspecialchars($server_teams[$player['team']]) . '</td></tr>';
-    
-    
+
+
                     // Check to see if this is a name hack.
                     if($player['server_name'] !== $player['gamespy_name']) {
                         // If the mismatch is due to our error messages move to the next loop iteration.
@@ -304,38 +311,51 @@ if (isset($ipaddr) && ($error === "")) {
             }
             $table .= '</tbody></table>';
         }
-    
+
         $report .= $hackers;
         $report .= $possible;
         $report .= $table;
-    
+
         echo '<script language="JavaScript">' . "\n";
         echo "<!--\n";
         echo 'updateStatus("");' . "\n";
         echo "-->\n";
         echo "</script>\n";
         flush();
-    
+
         if ($hackers !== "") {
             $tracker = "http://bf2tracker.com/webspec/index.php?addr=$ipaddr:$port:$spyport";
-            echo '<p>Please verify these name hackers at: <a href="' . $tracker . '">' 
+            echo '<p>Please verify these name hackers at: <a href="' . $tracker . '">'
                 . $tracker . '</a>. Click on the player\'s server name and verify that the user page displays the same PID and Gamespy name.';
         }
-    
+
         echo $hackers;
         echo $possible;
         echo $table;
-    
+
         if ($hackers !== "" && $use_database) {
             saveReport(htmlspecialchars($server_name) . " (" . $time . ")", $report,
                        "$dbserver:$dbport", $user, $pass, $database);
         }
-    
+
         echo "\n<!-- " . count($hackerArray) . " -->\n";
-    
+
         if ($use_database && count($hackerArray) > 0) {
             saveHackers($hackerArray, $server_name, "$server_ip:$server_port", "$dbserver:$dbport", $user, $pass, $database);
         }
+    } elseif ($info === false) {
+        ?>
+            <script language="JavaScript">
+            <!--
+            updateStatus("");
+            -->\n
+            </script>
+            <h2>Partial response from server</h2>
+            <p>The script made 5 attempts to query the server. On each attempt a partial response was received with
+            one or more UDP packets missing. This is an unfortunate aspect of UDP. The only thing to do is to try
+            again.</p>
+
+        <?php
     } else {
         ?>
             <script language="JavaScript">
@@ -344,19 +364,19 @@ if (isset($ipaddr) && ($error === "")) {
             -->\n
             </script>
             <h2>Unable to contact server</h2>
-            <p>This may because the server is down or the server is not on the port you 
+            <p>This may because the server is down or the server is not on the port you
             specified or the gamespy port is non-standard.</p>
-            <p>If the bf2 server is on the standard port of 16567, you do not need to 
-            specify it unless you also want to specify the gamespy port. Using the ATG Inf server 
-            as an example, you can specify this server as 72.233.42.82 or 
-            72.233.42.82:16567 or 72.233.42.82:16567:29900. The results will all be the 
+            <p>If the bf2 server is on the standard port of 16567, you do not need to
+            specify it unless you also want to specify the gamespy port. Using the ATG Inf server
+            as an example, you can specify this server as 72.233.42.82 or
+            72.233.42.82:16567 or 72.233.42.82:16567:29900. The results will all be the
             same.</p>
             <p>In most cases when a bf2 server on a port other than 16567, you just need
-            to enter the it as &lt;ip address&gt;:&lt;port&gt; (example 193.11.12.156:16569). In the 
-            cases where this does not work, a quick workaround is to look the server up on 
-            bf2tracker.com. When you view the server's information, the url will contain 
-            "addr=", the information following the equal sign can be used here. For example 
-            in the following url 
+            to enter the it as &lt;ip address&gt;:&lt;port&gt; (example 193.11.12.156:16569). In the
+            cases where this does not work, a quick workaround is to look the server up on
+            bf2tracker.com. When you view the server's information, the url will contain
+            "addr=", the information following the equal sign can be used here. For example
+            in the following url
             http://bf2tracker.com/webspec/index.php?addr=193.11.12.156:16569:29902 the
             193.11.12.156:16569:29902 is an acceptable value to use with this tool.</p>
 
@@ -399,12 +419,22 @@ function isFalseHit($player) {
 
     if (@stripos($player['gamespy_name'], $player['server_name']) === 0) {
         $ret = true;
+    } elseif($player['server_name'] == "") {
+        $ret = true;
     }
 
     return $ret;
 }
 
 function assembleData ($rsp) {
+    $numplayers = 0;
+    $numscores = 0;
+    $numpings = 0;
+    $numteams = 0;
+    $numdeaths = 0;
+    $numpids = 0;
+    $numskills = 0;
+    $numbots = 0;
 
     for($i=0; $i<count($rsp); $i++) {
         $rsp[$i] = substr($rsp[$i], strpos($rsp[$i], "PINGsplitnum") + 13);
@@ -413,10 +443,13 @@ function assembleData ($rsp) {
         echo "<!--" . str_replace("-->", "*dash*dash*gt*", $line) . "-->\n";
     }
     sort($rsp);
-    foreach($rsp as $i => $j) { 
-        $rsp[$i]=substr($j,2); 
+    foreach($rsp as $i => $j) {
+        $rsp[$i]=substr($j,2);
     }
+
     $rsp=implode("/\\=*=.separator.=*=/\\",$rsp);
+    $rsp = testStructure($rsp);
+
     $dat_array=Array("info" => Array(), "players" => Array(), "score" => Array());
     $i=1;
     $info = array();
@@ -433,7 +466,7 @@ function assembleData ($rsp) {
                     if ($arr[0]) { $dat_array[$cat][$i][$arr[0]]=$arr[1]; }
                     unset($dat_array[$cat][$i][$num]);
                 }
-                $info=array_merge($info,$dat_array[$cat][$i]);	
+                $info=array_merge($info,$dat_array[$cat][$i]);
             break;
             case "score":
                 if (!$i) {
@@ -447,17 +480,34 @@ function assembleData ($rsp) {
                     list($dat_array[$cat][$i][-1],$dat_array[$cat][$i][0]) =
                         explode((chr(0x00).chr($c)),$dat_array[$cat][$i][0]);
                     ksort($dat_array[$cat][$i]);
-                } else { 
-                    $c=0; 
+                } else {
+                    $c=0;
                 }
                 $dat_array[$cat][$i]=array_chunk($dat_array[$cat][$i],2);
                 foreach ($dat_array[$cat][$i] as $num => $arr) {
                     if ($arr[0]) {
-                        if ($arr[0][strlen($arr[0])-1]=="_") { 
-                            $arr[0]=substr($arr[0],0,strlen($arr[0])-1); 
+                        if ($arr[0][strlen($arr[0])-1]=="_") {
+                            $arr[0]=substr($arr[0],0,strlen($arr[0])-1);
                         }
-                        foreach(explode(chr(0x00),$arr[1]) as $value) { 
-                            ${$cat}[$c++][$arr[0]]=$value; 
+                        foreach(explode(chr(0x00),$arr[1]) as $value) {
+                            if ($arr[0] == "player" && !isset($players[$c][$arr[0]])) {
+                                $numplayers++;
+                            } elseif ($arr[0] == "score" && !isset($players[$c][$arr[0]])) {
+                                $numscores++;
+                            } elseif ($arr[0] == "ping" && !isset($players[$c][$arr[0]])) {
+                                $numpings++;
+                            } elseif ($arr[0] == "team" && !isset($players[$c][$arr[0]])) {
+                                $numteams++;
+                            } elseif ($arr[0] == "deaths" && !isset($players[$c][$arr[0]])) {
+                                $numdeaths++;
+                            } elseif ($arr[0] == "pid" && !isset($players[$c][$arr[0]])) {
+                                $numpids++;
+                            } elseif ($arr[0] == "skill" && !isset($players[$c][$arr[0]])) {
+                                $numskills++;
+                            } elseif ($arr[0] == "AIBot" && !isset($players[$c][$arr[0]])) {
+                                $numbots++;
+                            }
+                            ${$cat}[$c++][$arr[0]]=$value;
                         }
                         $c=0;
                     }
@@ -467,12 +517,46 @@ function assembleData ($rsp) {
     }
     unset($dat_array);
 
+    if (!isset($info['numplayers'])) {
+        return false;
+    }
+
+    $num = $info['numplayers'];
+
+    if ($numplayers != $num || $numscores != $num || $numpings != $num || $numteams != $num || $numdeaths != $num
+        || $numpids != $num || $numskills != $num || $numbots != $num) {
+
+        return false;
+    }
+
+    if (!isset($score[1])) {
+        return false;
+    }
+
     $return_array = array();
     $return_array['info'] = $info;
     $return_array['players'] = $players;
     $return_array['score'] = $score;
 
     return $return_array;
+}
+
+function testStructure($rsp) {
+
+    // This will handle when we get each data segment back as a separate packet and we are missing the 3 byte sequence.
+    if (strpos($rsp, chr(0X00).chr(0X00)."/\\=*=.separator.=*=/\\player_") !== false) {
+        $rsp = str_replace(chr(0X00).chr(0X00)."/\\=*=.separator.=*=/\\player_", 
+                           chr(0X00).chr(0X00).chr(0X01)."/\\=*=.separator.=*=/\\player_",
+                           $rsp);
+    }
+
+    if (strpos($rsp, chr(0X00).chr(0X00)."/\\=*=.separator.=*=/\\team_t") !== false) {
+        $rsp = str_replace(chr(0X00).chr(0X00)."/\\=*=.separator.=*=/\\team_t", 
+                           chr(0X00).chr(0X00).chr(0X02)."/\\=*=.separator.=*=/\\team_t",
+                           $rsp);
+    }
+    
+    return $rsp;
 }
 
 function saveReport($title, $report, $dbserver, $user, $pass, $database) {
