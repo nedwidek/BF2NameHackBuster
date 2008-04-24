@@ -67,7 +67,7 @@ if ($pid) {
     }
     echo "</ul>";
 } else {
-    $query = "SELECT pid, gamespy_name FROM hackers";
+    $query = "SELECT pid, gamespy_name FROM hackers ORDER BY gamespy_name";
 
     $result = mysql_query($query);
 

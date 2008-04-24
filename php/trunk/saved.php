@@ -52,7 +52,7 @@ if ($id) {
         echo $report;
     }
 } else {
-    $query = "SELECT id, title FROM reports";
+    $query = "SELECT id, title FROM reports ORDER BY id";
 
     $result = mysql_query($query);
 

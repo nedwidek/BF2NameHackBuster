@@ -31,6 +31,8 @@ include_once("./head.php");
 
 ?>
 
+
+
 <h2>BF2 Name Hack Buster</h2>
 <?php
 
@@ -84,7 +86,7 @@ if (isset($ipaddr)) {
 echo '<table width="100%" border="1" id="formtable" bgcolor="1E1C18">';
 echo '<tr>';
 echo '<td border="0">';
-echo "<form method=\"post\" action=\"" . $PHP_SELF . "\">";
+echo "<form name=\"theForm\" method=\"post\" action=\"" . $PHP_SELF . "\">";
 if ($error !== "") {
     echo '<span style="color: red; font-size: x-small;">' . $error . '</span><br>';
 }
@@ -94,8 +96,53 @@ if (isset($ipaddr)) {
     echo $ipaddr . (($port != 0)?":$port":"") . (($spyport != 0)?":$spyport":"");
 }
 echo  "\"/>";
-echo "<input type=\"submit\" name=\"submit\" value=\"Check\"/>";
+echo "<input type=\"submit\" name=\"submit\" value=\"Check\"/><br>
+    <input type=\"checkbox\" name=\"play\" id=\"play\"";
+if (isset($_REQUEST['play'])) {
+    echo " checked";
+}
 
+if (!isset($_REQUEST['volume']) || $_REQUEST['volume'] < 10 || $_REQUEST['volume'] > 100) {
+    $_REQUEST['volume'] = 70;
+} else {
+    // Make sure it is one of the correct values.
+    $_REQUEST['volume'] = $_REQUEST['volume'] - $_REQUEST['volume'] % 10;
+}
+
+echo "> Play sound alert if a name hacker is found?<span style=\"width: 15px;\"></span>
+    <select name=\"volume\" id=\"volume\" onchange=\"setVol(this.options[selectedIndex].value);\">";
+for ($i=10; $i<101; $i+=10) {
+    echo "        <option value=\"$i\"";
+    if ($_REQUEST['volume'] == $i) {
+        echo " selected";
+    }
+    echo ">$i%</option>\n";
+}
+echo "    </select><input type=\"button\" value=\"Test\" onClick=\"javascript:playsound();\"><br>
+    <input type=\"checkbox\" name=\"monitor\" id=\"monitor\"";
+
+if (isset($_REQUEST['monitor'])) {
+    echo " checked";
+}
+echo "> Automatically rescan server every two minutes?";
+
+if (isset($_REQUEST['monitor'])) {
+    echo '<script language="JavaScript">
+        function autoReload() {
+            cb = document.getElementById("monitor");
+            play = document.getElementById("play");
+            if (cb.checked) {
+                var url = "index.php?ipaddr=' . $ipaddr . (($port != 0)?":$port":"") 
+                    . (($spyport != 0)?":$spyport":"") .'&monitor=1&volume=" + volume;
+                if (play.checked) {
+                    url += "&play=1";
+                }
+                location.href = url;
+            }
+        }
+        setTimeout("autoReload()", 120000); 
+        </script>';
+}
 ?>
 </form>
 </td>
@@ -164,10 +211,6 @@ if (isset($ipaddr) && ($error === "")) {
 
     if (isset($results['check']['status'])) {
 
-        echo "<!--";
-        echo str_replace("-->", "*dash*dash*gt*", print_r($info, true));
-        echo "-->";
-
         $server_name = $info['info']['hostname'];
         $server_ip = $ipaddr;
         $server_port = $info['info']['hostport'];
@@ -184,9 +227,6 @@ if (isset($ipaddr) && ($error === "")) {
         $numErrors = 0;
         if ($server_numplayers > 0) {
             foreach($info['players'] as $player) {
-                echo "<!--";
-                echo str_replace("-->", "*dash*dash*gt*", print_r($player, true));
-                echo "-->";
                 if (($pos = strrpos($player['player'], " ")) > -1) {
                     $players[$i]['clan_tag'] = substr($player['player'], 0, $pos);
                     $players[$i]['server_name'] = substr($player['player'], $pos + 1);
@@ -319,6 +359,10 @@ if (isset($ipaddr) && ($error === "")) {
         echo '<script language="JavaScript">' . "\n";
         echo "<!--\n";
         echo 'updateStatus("");' . "\n";
+        if (isset($_REQUEST['play']) && $hackers != "") {
+            echo "pleasePlay = 1;\n";
+        }
+
         echo "-->\n";
         echo "</script>\n";
         flush();
@@ -337,8 +381,6 @@ if (isset($ipaddr) && ($error === "")) {
             saveReport(htmlspecialchars($server_name) . " (" . $time . ")", $report,
                        "$dbserver:$dbport", $user, $pass, $database);
         }
-
-        echo "\n<!-- " . count($hackerArray) . " -->\n";
 
         if ($use_database && count($hackerArray) > 0) {
             saveHackers($hackerArray, $server_name, "$server_ip:$server_port", "$dbserver:$dbport", $user, $pass, $database);
@@ -406,9 +448,6 @@ function getGamespyName($pid) {
     $matches = array();
     preg_match('/^D\s+' . $pid . '\s+(\S+)\s+.*/m', $response, $matches);
 
-    echo "<!--";
-    echo str_replace("-->", "*dash*dash*gt*", $response);
-    echo "-->";
     return $matches[1];
 
 }
@@ -439,9 +478,7 @@ function assembleData ($rsp) {
     for($i=0; $i<count($rsp); $i++) {
         $rsp[$i] = substr($rsp[$i], strpos($rsp[$i], "PINGsplitnum") + 13);
     }
-    foreach($rsp as $line) {
-        echo "<!--" . str_replace("-->", "*dash*dash*gt*", $line) . "-->\n";
-    }
+    
     sort($rsp);
     foreach($rsp as $i => $j) {
         $rsp[$i]=substr($j,2);
@@ -585,8 +622,6 @@ function saveHackers($hackerArray, $server_name, $server_addr,
                          mysql_real_escape_string($hacker['gamespy_name']));
         mysql_query($query);
 
-        echo "<!-- " . mysql_error() . "-->";
-
         if ($hacker['server_name'] == "") {
             $hacker['server_name'] = " ";
         }
@@ -598,7 +633,6 @@ function saveHackers($hackerArray, $server_name, $server_addr,
                          mysql_real_escape_string($server_addr),
                          mysql_real_escape_string(date("Y/m/d H:i:s T")));
         mysql_query($query);
-        echo "<!-- " . mysql_error() . "-->";
     }
     
     mysql_close();
